@@ -1,6 +1,10 @@
 ---
-dependencies: null
-description: "'A pkg in Coin Galaxy.'"
+dependencies:
+  decimal: ^3.0.0
+  finance_kline_core: ^0.0.4
+  http: ^1.2.0
+  market_interface: ^0.0.1
+description: '''A pkg in Coin Galaxy.'''
 dev_dependencies:
   auto_exporter: ^4.0.0
   build_runner: ^2.6.0
@@ -8,12 +12,12 @@ dev_dependencies:
   very_good_analysis: any
 environment:
   sdk: ^3.0.0
-name: dart_pkg_temp
-homepage: https://github.com/normidar/dart_pkg_temp
+homepage: https://github.com/normidar/market_okx
+name: market_okx
 topics:
-  - a
-  - b
-  - c
-  - d
-  - e
-version: 0.0.1
+  - okx
+  - market
+  - exchange
+  - trading
+  - api
+version: 0.0.1  Set<Interval> getSupportedIntervals() {  Set<Interval> getSupportedIntervals() {
