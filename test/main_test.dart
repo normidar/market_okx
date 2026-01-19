@@ -32,16 +32,83 @@ void main() {
     );
 
     test(
-      'getKlineHistory fetches candle data',
+      'getKlineHistory fetches candle data with limit <= 300',
       () async {
+        const count = 100;
         final candles = await market.getKlineHistory(
           instrument: 'BTC-USDT',
           interval: Interval.$1h,
-          limit: 10,
+          limit: count,
         );
 
         expect(candles, isNotEmpty);
-        expect(candles.length, lessThanOrEqualTo(10));
+        expect(candles.length, lessThanOrEqualTo(count));
+      },
+    );
+
+    test(
+      'getKlineHistory fetches candle data with limit > 300',
+      () async {
+        const count = 500;
+        final candles = await market.getKlineHistory(
+          instrument: 'BTC-USDT',
+          interval: Interval.$1h,
+          limit: count,
+        );
+
+        expect(candles, isNotEmpty);
+        expect(candles.length, lessThanOrEqualTo(count));
+        print('Fetched ${candles.length} candles with pagination');
+      },
+    );
+
+    test(
+      'getKlineHistory fetches maximum 1440 candles',
+      () async {
+        const count = 1440;
+        final candles = await market.getKlineHistory(
+          instrument: 'BTC-USDT',
+          interval: Interval.$1h,
+          limit: count,
+        );
+
+        expect(candles, isNotEmpty);
+        expect(candles.length, lessThanOrEqualTo(count));
+        print('Fetched ${candles.length} candles at maximum limit');
+      },
+    );
+
+    test(
+      'getKlineHistory throws error when limit exceeds 1440',
+      () async {
+        expect(
+          () => market.getKlineHistory(
+            instrument: 'BTC-USDT',
+            interval: Interval.$1h,
+            limit: 1441,
+          ),
+          throwsA(isA<ArgumentError>()),
+        );
+      },
+    );
+
+    test(
+      'getKlineHistory throws error when limit is much larger than 1440',
+      () async {
+        expect(
+          () => market.getKlineHistory(
+            instrument: 'BTC-USDT',
+            interval: Interval.$1h,
+            limit: 5000,
+          ),
+          throwsA(
+            isA<ArgumentError>().having(
+              (e) => e.message,
+              'message',
+              contains('1440'),
+            ),
+          ),
+        );
       },
     );
 

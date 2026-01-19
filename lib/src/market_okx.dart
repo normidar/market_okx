@@ -47,7 +47,97 @@ class MarketOkx extends Market {
     DateTime? startTime,
     DateTime? endTime,
   }) async {
+    // Validate limit according to OKX API constraints
+    if (limit > 1440) {
+      throw ArgumentError(
+        'Limit must be 1440 or less. Requested: $limit',
+      );
+    }
+
     final bar = _getBarInterval(interval);
+
+    // If limit <= 300, make a single request
+    if (limit <= 300) {
+      final result = await _fetchCandlesWithTimestamp(
+        instrument: instrument,
+        bar: bar,
+        limit: limit,
+        startTime: startTime,
+        endTime: endTime,
+      );
+      return result.ohlcvList;
+    }
+
+    // If limit > 300, make multiple requests with pagination
+    final allOhlcv = <Ohlcv>[];
+    var remaining = limit;
+    var currentBefore = endTime?.millisecondsSinceEpoch.toString();
+
+    while (remaining > 0) {
+      final batchLimit = remaining > 300 ? 300 : remaining;
+
+      final result = await _fetchCandlesWithTimestamp(
+        instrument: instrument,
+        bar: bar,
+        limit: batchLimit,
+        startTime: startTime,
+        endTime: currentBefore != null
+            ? DateTime.fromMillisecondsSinceEpoch(int.parse(currentBefore))
+            : null,
+      );
+
+      if (result.ohlcvList.isEmpty) {
+        break; // No more data available
+      }
+
+      allOhlcv.addAll(result.ohlcvList);
+      remaining -= result.ohlcvList.length;
+
+      // If we got less data than requested, no more data is available
+      if (result.ohlcvList.length < batchLimit) {
+        break;
+      }
+
+      // Update the 'before' parameter with the oldest timestamp from this batch
+      // OKX returns data in descending order (newest first)
+      // The last element has the oldest timestamp
+      currentBefore = result.oldestTimestamp;
+    }
+
+    return allOhlcv;
+  }
+
+  @override
+  Set<Interval> getSupportedIntervals() {
+    return {
+      Interval.$1m,
+      Interval.$3m,
+      Interval.$5m,
+      Interval.$15m,
+      Interval.$30m,
+      Interval.$1h,
+      Interval.$2h,
+      Interval.$4h,
+      Interval.$6h,
+      Interval.$8h,
+      Interval.$12h,
+      Interval.$1d,
+      Interval.$2d,
+      Interval.$3d,
+      Interval.$1w,
+      Interval.$1M,
+    };
+  }
+
+  /// Fetch candles from OKX API with timestamp tracking
+  Future<({List<Ohlcv> ohlcvList, String? oldestTimestamp})>
+      _fetchCandlesWithTimestamp({
+    required String instrument,
+    required String bar,
+    required int limit,
+    DateTime? startTime,
+    DateTime? endTime,
+  }) async {
     final queryParams = <String, String>{
       'instId': instrument,
       'bar': bar,
@@ -82,10 +172,12 @@ class MarketOkx extends Market {
 
     final data = json['data'] as List<dynamic>;
     final ohlcvList = <Ohlcv>[];
+    String? oldestTimestamp;
 
     for (final item in data) {
       final arr = item as List<dynamic>;
       // OKX candles format: [ts, o, h, l, c, vol, volCcy, volCcyQuote, confirm]
+      final timestamp = arr[0] as String;
       final open = Decimal.parse(arr[1] as String);
       final high = Decimal.parse(arr[2] as String);
       final low = Decimal.parse(arr[3] as String);
@@ -101,31 +193,12 @@ class MarketOkx extends Market {
           volume: volume,
         ),
       );
+
+      // Keep track of the oldest (last) timestamp for pagination
+      oldestTimestamp = timestamp;
     }
 
-    return ohlcvList;
-  }
-
-  @override
-  Set<Interval> getSupportedIntervals() {
-    return {
-      Interval.$1m,
-      Interval.$3m,
-      Interval.$5m,
-      Interval.$15m,
-      Interval.$30m,
-      Interval.$1h,
-      Interval.$2h,
-      Interval.$4h,
-      Interval.$6h,
-      Interval.$8h,
-      Interval.$12h,
-      Interval.$1d,
-      Interval.$2d,
-      Interval.$3d,
-      Interval.$1w,
-      Interval.$1M,
-    };
+    return (ohlcvList: ohlcvList, oldestTimestamp: oldestTimestamp);
   }
 
   /// Convert Interval to OKX bar parameter
