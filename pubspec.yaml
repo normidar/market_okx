@@ -20,4 +20,4 @@ topics:
   - exchange
   - trading
   - api
-version: 0.0.1  Set<Interval> getSupportedIntervals() {  Set<Interval> getSupportedIntervals() {
+version: 0.0.1

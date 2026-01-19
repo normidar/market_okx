@@ -12,7 +12,7 @@ void main() {
 
     test('getSupportedIntervals returns all OKX intervals', () {
       final intervals = market.getSupportedIntervals();
-      
+
       expect(intervals, isNotEmpty);
       expect(intervals, contains(Interval.$1m));
       expect(intervals, contains(Interval.$1h));
@@ -20,23 +20,30 @@ void main() {
       expect(intervals, contains(Interval.$1w));
     });
 
-    test('getInstruments fetches spot instruments', () async {
-      final instruments = await market.getInstruments(type: InstrumentType.spot);
-      
-      expect(instruments, isNotEmpty);
-      expect(instruments, isA<List<String>>());
-    }, skip: 'Requires network connection');
+    test(
+      'getInstruments fetches spot instruments',
+      () async {
+        final instruments =
+            await market.getInstruments(type: InstrumentType.spot);
 
-    test('getKlineHistory fetches candle data', () async {
-      final candles = await market.getKlineHistory(
-        instrument: 'BTC-USDT',
-        interval: Interval.$1h,
-        limit: 10,
-      );
-      
-      expect(candles, isNotEmpty);
-      expect(candles.length, lessThanOrEqualTo(10));
-    }, skip: 'Requires network connection');
+        expect(instruments, isNotEmpty);
+        expect(instruments, isA<List<String>>());
+      },
+    );
+
+    test(
+      'getKlineHistory fetches candle data',
+      () async {
+        final candles = await market.getKlineHistory(
+          instrument: 'BTC-USDT',
+          interval: Interval.$1h,
+          limit: 10,
+        );
+
+        expect(candles, isNotEmpty);
+        expect(candles.length, lessThanOrEqualTo(10));
+      },
+    );
 
     tearDown(() {
       market.dispose();
