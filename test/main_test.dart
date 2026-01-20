@@ -79,13 +79,14 @@ void main() {
     );
 
     test(
-      'getKlineHistory throws error when limit exceeds 1440',
+      'getKlineHistory throws error when limit exceeds 1440 for recent data',
       () async {
         expect(
           () => market.getKlineHistory(
             instrument: 'BTC-USDT',
             interval: Interval.$1h,
             limit: 1441,
+            // No endTime means recent data, which has 1440 limit
           ),
           throwsA(isA<ArgumentError>()),
         );
@@ -93,13 +94,65 @@ void main() {
     );
 
     test(
-      'getKlineHistory throws error when limit is much larger than 1440',
+      'getKlineHistory throws error when limit is much larger than 1440 for recent data',
       () async {
         expect(
           () => market.getKlineHistory(
             instrument: 'BTC-USDT',
             interval: Interval.$1h,
             limit: 5000,
+            // No endTime means recent data, which has 1440 limit
+          ),
+          throwsA(
+            isA<ArgumentError>().having(
+              (e) => e.message,
+              'message',
+              contains('1440'),
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'getKlineHistory automatically uses history-candles for old data',
+      () async {
+        const count = 1500;
+        // Use endTime more than 1 hour in the past to trigger history-candles
+        // The endpoint is automatically selected based on the timestamp
+        final endTime = DateTime.now().subtract(const Duration(hours: 26));
+
+        // This should NOT throw an error because it automatically uses
+        // history-candles endpoint which has no 1440 limit
+        final candles = await market.getKlineHistory(
+          instrument: 'BTC-USDT',
+          interval: Interval.$1m,
+          limit: count,
+          endTime: endTime,
+        );
+
+        expect(candles, isNotEmpty);
+        expect(candles.length, lessThanOrEqualTo(count));
+        print(
+          'Fetched ${candles.length} historical candles with limit $count (auto-selected history-candles)',
+        );
+      },
+    );
+
+    test(
+      'getKlineHistory throws error for limit > 1440 with recent endTime',
+      () async {
+        // endTime less than 1 hour ago is considered "recent"
+        // so the 1440 limit still applies
+        final recentEndTime =
+            DateTime.now().subtract(const Duration(minutes: 30));
+
+        expect(
+          () => market.getKlineHistory(
+            instrument: 'BTC-USDT',
+            interval: Interval.$1m,
+            limit: 1500,
+            endTime: recentEndTime,
           ),
           throwsA(
             isA<ArgumentError>().having(

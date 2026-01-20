@@ -47,10 +47,15 @@ class MarketOkx extends Market {
     DateTime? startTime,
     DateTime? endTime,
   }) async {
+    // Determine if we're fetching historical data or recent data
+    final isHistoricalData = _isHistoricalData(endTime);
+
     // Validate limit according to OKX API constraints
-    if (limit > 1440) {
+    // Only apply 1440 limit for recent data
+    // Historical data endpoint (/api/v5/market/history-candles) has no such limit
+    if (!isHistoricalData && limit > 1440) {
       throw ArgumentError(
-        'Limit must be 1440 or less. Requested: $limit',
+        'Limit must be 1440 or less for recent data. Requested: $limit',
       );
     }
 
@@ -101,7 +106,13 @@ class MarketOkx extends Market {
       // Update the 'before' parameter with the oldest timestamp from this batch
       // OKX returns data in descending order (newest first)
       // The last element has the oldest timestamp
-      currentBefore = result.oldestTimestamp;
+      // We need to subtract 1ms to avoid getting the same timestamp again
+      if (result.oldestTimestamp != null) {
+        final oldestMs = int.parse(result.oldestTimestamp!);
+        currentBefore = (oldestMs - 1).toString();
+      } else {
+        break; // No timestamp available, stop pagination
+      }
     }
 
     return allOhlcv;
@@ -153,8 +164,15 @@ class MarketOkx extends Market {
       queryParams['after'] = startTime.millisecondsSinceEpoch.toString();
     }
 
-    final url = Uri.parse('$_baseUrl/api/v5/market/candles')
-        .replace(queryParameters: queryParams);
+    // Automatically choose the appropriate endpoint based on the data being requested
+    // - history-candles: for historical data (no 1440 limit)
+    // - candles: for recent data (1440 limit applies)
+    final useHistoryEndpoint = _isHistoricalData(endTime);
+    final endpoint = useHistoryEndpoint
+        ? '/api/v5/market/history-candles'
+        : '/api/v5/market/candles';
+    final url =
+        Uri.parse('$_baseUrl$endpoint').replace(queryParameters: queryParams);
 
     final response = await _client.get(url);
 
@@ -255,5 +273,22 @@ class MarketOkx extends Market {
       case InstrumentType.options:
         return 'OPTION';
     }
+  }
+
+  /// Determine if we should use the history-candles endpoint
+  ///
+  /// Returns true if the data being requested is historical (not recent).
+  /// Historical data uses the history-candles endpoint which has no 1440 limit.
+  bool _isHistoricalData(DateTime? endTime) {
+    if (endTime == null) {
+      return false; // No endTime means fetching recent data
+    }
+
+    // If endTime is more than 1 hour in the past, consider it historical
+    // This threshold can be adjusted based on your needs
+    final now = DateTime.now();
+    final threshold = now.subtract(const Duration(hours: 1));
+
+    return endTime.isBefore(threshold);
   }
 }
