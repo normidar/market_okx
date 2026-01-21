@@ -48,7 +48,7 @@ class MarketOkx extends Market {
     DateTime? endTime,
   }) async {
     // Determine if we're fetching historical data or recent data
-    final isHistoricalData = _isHistoricalData(endTime);
+    final isHistoricalData = _isHistoricalData(endTime, interval);
 
     // Validate limit according to OKX API constraints
     // Only apply 1440 limit for recent data
@@ -67,6 +67,7 @@ class MarketOkx extends Market {
         instrument: instrument,
         bar: bar,
         limit: limit,
+        interval: interval,
         startTime: startTime,
         endTime: endTime,
       );
@@ -85,6 +86,7 @@ class MarketOkx extends Market {
         instrument: instrument,
         bar: bar,
         limit: batchLimit,
+        interval: interval,
         startTime: startTime,
         endTime: currentBefore != null
             ? DateTime.fromMillisecondsSinceEpoch(int.parse(currentBefore))
@@ -146,6 +148,7 @@ class MarketOkx extends Market {
     required String instrument,
     required String bar,
     required int limit,
+    required Interval interval,
     DateTime? startTime,
     DateTime? endTime,
   }) async {
@@ -167,7 +170,7 @@ class MarketOkx extends Market {
     // Automatically choose the appropriate endpoint based on the data being requested
     // - history-candles: for historical data (no 1440 limit)
     // - candles: for recent data (1440 limit applies)
-    final useHistoryEndpoint = _isHistoricalData(endTime);
+    final useHistoryEndpoint = _isHistoricalData(endTime, interval);
     final endpoint = useHistoryEndpoint
         ? '/api/v5/market/history-candles'
         : '/api/v5/market/candles';
@@ -279,7 +282,7 @@ class MarketOkx extends Market {
   ///
   /// Returns true if the data being requested is historical (not recent).
   /// Historical data uses the history-candles endpoint which has no 1440 limit.
-  bool _isHistoricalData(DateTime? endTime) {
+  bool _isHistoricalData(DateTime? endTime, Interval interval) {
     if (endTime == null) {
       return false; // No endTime means fetching recent data
     }
@@ -287,7 +290,7 @@ class MarketOkx extends Market {
     // If endTime is more than 1 hour in the past, consider it historical
     // This threshold can be adjusted based on your needs
     final now = DateTime.now();
-    final threshold = now.subtract(const Duration(hours: 1));
+    final threshold = now.subtract(interval.duration * 3);
 
     return endTime.isBefore(threshold);
   }

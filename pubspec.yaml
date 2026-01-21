@@ -3,7 +3,7 @@ dependencies:
   decimal: ^3.0.0
   finance_kline_core: ^0.0.4
   http: ^1.2.0
-  market_interface: ^0.0.1
+  market_interface: ^0.0.2
 description: '''A pkg in Coin Galaxy.'''
 dev_dependencies:
   auto_exporter: ^4.0.0
