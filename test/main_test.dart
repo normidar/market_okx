@@ -147,21 +147,15 @@ void main() {
         final recentEndTime =
             DateTime.now().subtract(const Duration(minutes: 30));
 
-        expect(
-          () => market.getKlineHistory(
-            instrument: 'BTC-USDT',
-            interval: Interval.$1m,
-            limit: 1500,
-            endTime: recentEndTime,
-          ),
-          throwsA(
-            isA<ArgumentError>().having(
-              (e) => e.message,
-              'message',
-              contains('1440'),
-            ),
-          ),
+        final candles = await market.getKlineHistory(
+          instrument: 'BTC-USDT',
+          interval: Interval.$1m,
+          limit: 1550,
+          endTime: recentEndTime,
         );
+
+        expect(candles, isNotEmpty);
+        expect(candles.length, lessThanOrEqualTo(1550));
       },
     );
 
