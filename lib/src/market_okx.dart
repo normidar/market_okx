@@ -6,16 +6,60 @@ import 'package:finance_kline_core/finance_kline_core.dart';
 import 'package:http/http.dart' as http;
 import 'package:market_interface/market_interface.dart';
 
+/// A market data provider for OKX exchange.
+///
+/// This class implements the [Market] interface and provides access to
+/// OKX's public market data API, including:
+/// - Fetching available trading instruments
+/// - Getting historical OHLCV (candlestick) data
+/// - Support for multiple timeframes (1m to 1M)
+/// - Automatic pagination for large data requests
+///
+/// Example usage:
+/// ```dart
+/// final market = MarketOkx();
+/// try {
+///   final instruments = await market.getInstruments(
+///     type: InstrumentType.spot,
+///   );
+///   final candles = await market.getKlineHistory(
+///     instrument: 'BTC-USDT',
+///     interval: Interval.$1h,
+///     limit: 100,
+///   );
+/// } finally {
+///   market.dispose();
+/// }
+/// ```
 class MarketOkx extends Market {
+  /// Creates a new [MarketOkx] instance.
+  ///
+  /// Optionally accepts a custom [http.Client] for dependency injection
+  /// and testing purposes. If not provided, a default client is created.
   MarketOkx({http.Client? client}) : _client = client ?? http.Client();
+
+  /// The base URL for OKX API
   static const String _baseUrl = 'https://www.okx.com';
 
   final http.Client _client;
 
+  /// Disposes the HTTP client and releases resources.
+  ///
+  /// Should be called when the [MarketOkx] instance is no longer needed
+  /// to prevent resource leaks.
   void dispose() {
     _client.close();
   }
 
+  /// Fetches a list of available trading instruments from OKX.
+  ///
+  /// Parameters:
+  /// - [type]: The type of instruments to fetch
+  ///   (spot, perpetual, futures, etc.)
+  ///
+  /// Returns a list of instrument IDs (e.g., 'BTC-USDT', 'ETH-USDT').
+  ///
+  /// Throws an [Exception] if the API request fails or returns an error.
   @override
   Future<List<String>> getInstruments({required InstrumentType type}) async {
     final instType = _getInstType(type);
@@ -39,6 +83,27 @@ class MarketOkx extends Market {
     return data.map((item) => item['instId'] as String).toList();
   }
 
+  /// Fetches historical OHLCV (candlestick) data from OKX.
+  ///
+  /// Parameters:
+  /// - [instrument]: The trading pair (e.g., 'BTC-USDT')
+  /// - [interval]: The timeframe for each candle (e.g., Interval.$1h)
+  /// - [limit]: The number of candles to fetch
+  /// - [startTime]: Optional start time for the data range
+  /// - [endTime]: Optional end time for the data range
+  ///
+  /// Returns a list of [Ohlcv] objects containing open, high, low, close,
+  /// and volume data for each candle.
+  ///
+  /// Note: For recent data (within 3 intervals of current time), the maximum
+  /// limit is 1440. For historical data, there is no limit. The method
+  /// automatically selects the appropriate endpoint based on the [endTime].
+  ///
+  /// If [limit] exceeds 300, the method automatically makes multiple paginated
+  /// requests to fetch all the requested data.
+  ///
+  /// Throws an [ArgumentError] if the limit exceeds 1440 for recent data.
+  /// Throws an [Exception] if the API request fails or returns an error.
   @override
   Future<OhlcvSeries> getKlineHistory({
     required String instrument,
@@ -52,7 +117,8 @@ class MarketOkx extends Market {
 
     // Validate limit according to OKX API constraints
     // Only apply 1440 limit for recent data
-    // Historical data endpoint (/api/v5/market/history-candles) has no such limit
+    // Historical data endpoint (/api/v5/market/history-candles)
+    // has no such limit
     if (!isHistoricalData && limit > 1440) {
       throw ArgumentError(
         'Limit must be 1440 or less for recent data. Requested: $limit',
@@ -82,15 +148,17 @@ class MarketOkx extends Market {
     while (remaining > 0) {
       final batchLimit = remaining > 300 ? 300 : remaining;
 
+      final beforeTime = currentBefore != null
+          ? DateTime.fromMillisecondsSinceEpoch(int.parse(currentBefore))
+          : null;
+
       final result = await _fetchCandlesWithTimestamp(
         instrument: instrument,
         bar: bar,
         limit: batchLimit,
         interval: interval,
         startTime: startTime,
-        endTime: currentBefore != null
-            ? DateTime.fromMillisecondsSinceEpoch(int.parse(currentBefore))
-            : null,
+        endTime: beforeTime,
       );
 
       if (result.ohlcvList.isEmpty) {
@@ -105,8 +173,8 @@ class MarketOkx extends Market {
         break;
       }
 
-      // Update the 'before' parameter with the oldest timestamp from this batch
-      // OKX returns data in descending order (newest first)
+      // Update the 'before' parameter with the oldest timestamp
+      // from this batch. OKX returns data in descending order (newest first)
       // The last element has the oldest timestamp
       // We need to subtract 1ms to avoid getting the same timestamp again
       if (result.oldestTimestamp != null) {
@@ -120,6 +188,14 @@ class MarketOkx extends Market {
     return allOhlcv;
   }
 
+  /// Returns the set of intervals supported by OKX.
+  ///
+  /// OKX supports the following timeframes:
+  /// - Minutes: 1m, 3m, 5m, 15m, 30m
+  /// - Hours: 1h, 2h, 4h, 6h, 8h, 12h
+  /// - Days: 1d, 2d, 3d
+  /// - Week: 1w
+  /// - Month: 1M
   @override
   Set<Interval> getSupportedIntervals() {
     return {
@@ -167,7 +243,8 @@ class MarketOkx extends Market {
       queryParams['after'] = endTime.millisecondsSinceEpoch.toString();
     }
 
-    // Automatically choose the appropriate endpoint based on the data being requested
+    // Automatically choose the appropriate endpoint based on the data
+    // being requested
     // - history-candles: for historical data (no 1440 limit)
     // - candles: for recent data (1440 limit applies)
     final useHistoryEndpoint = _isHistoricalData(endTime, interval);

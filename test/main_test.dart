@@ -58,6 +58,7 @@ void main() {
 
         expect(candles, isNotEmpty);
         expect(candles.length, lessThanOrEqualTo(count));
+        // ignore: avoid_print
         print('Fetched ${candles.length} candles with pagination');
       },
     );
@@ -74,12 +75,14 @@ void main() {
 
         expect(candles, isNotEmpty);
         expect(candles.length, lessThanOrEqualTo(count));
+        // ignore: avoid_print
         print('Fetched ${candles.length} candles at maximum limit');
       },
     );
 
     test(
-      'getKlineHistory throws error when limit exceeds 1440 for recent data',
+      'getKlineHistory throws error when limit exceeds 1440 '
+      'for recent data',
       () async {
         expect(
           () => market.getKlineHistory(
@@ -94,7 +97,8 @@ void main() {
     );
 
     test(
-      'getKlineHistory throws error when limit is much larger than 1440 for recent data',
+      'getKlineHistory throws error when limit is much larger '
+      'than 1440 for recent data',
       () async {
         expect(
           () => market.getKlineHistory(
@@ -133,8 +137,10 @@ void main() {
 
         expect(candles, isNotEmpty);
         expect(candles.length, lessThanOrEqualTo(count));
+        // ignore: avoid_print
         print(
-          'Fetched ${candles.length} historical candles with limit $count (auto-selected history-candles)',
+          'Fetched ${candles.length} historical candles with limit $count '
+          '(auto-selected history-candles)',
         );
       },
     );

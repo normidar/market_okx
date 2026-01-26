@@ -12,3 +12,5 @@ analyzer:
     use_setters_to_change_properties: ignore
     flutter_style_todos: ignore
     invalid_annotation_target: ignore
+    document_ignores: ignore
+    avoid_dynamic_calls: ignore
