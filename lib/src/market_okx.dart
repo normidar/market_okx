@@ -160,11 +160,11 @@ class MarketOkx extends Market {
 
     // OKX uses 'after' for data older than timestamp (pagination forward)
     // and 'before' for data newer than timestamp (pagination backward)
-    if (endTime != null) {
-      queryParams['before'] = endTime.millisecondsSinceEpoch.toString();
-    }
     if (startTime != null) {
-      queryParams['after'] = startTime.millisecondsSinceEpoch.toString();
+      queryParams['before'] = startTime.millisecondsSinceEpoch.toString();
+    }
+    if (endTime != null) {
+      queryParams['after'] = endTime.millisecondsSinceEpoch.toString();
     }
 
     // Automatically choose the appropriate endpoint based on the data being requested
